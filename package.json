@@ -1,5 +1,5 @@
 {
-  "name": "sesmailer",
+  "name": "geniusdomainnames",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -9,12 +9,18 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@aws-sdk/client-ses": "^3.1085.0",
+    "@neondatabase/serverless": "^1.1.0",
+    "@trigger.dev/sdk": "4.5.1",
+    "firecrawl": "^4.29.2",
     "next": "16.2.10",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@trigger.dev/build": "4.5.1",
     "babel-plugin-react-compiler": "1.0.0",
     "eslint": "^9",
     "eslint-config-next": "16.2.10",
