@@ -8,6 +8,7 @@ export default function AdminDashboardLayout({ children }) {
   const router = useRouter();
   const pathname = usePathname();
   const [authorized, setAuthorized] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
     const isLoggedIn = localStorage.getItem("genius_admin_session");
@@ -113,68 +114,113 @@ export default function AdminDashboardLayout({ children }) {
       {/* Main Panel */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Header */}
-        <header className="h-16 border-b border-zinc-200/50 bg-white dark:border-zinc-800/50 dark:bg-zinc-900 flex items-center justify-between px-6 sm:px-8 flex-shrink-0">
-          <div className="flex items-center gap-4">
-            {/* Mobile menu toggle (simple route selector) */}
-            <div className="md:hidden flex items-center gap-2">
-              <Link
-                href="/admin/dashboard"
-                className={`p-2 text-xs font-semibold rounded-lg ${
-                  pathname === "/admin/dashboard" ? "bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-white" : "text-zinc-550 dark:text-zinc-400"
-                }`}
-              >
-                Overview
-              </Link>
-              <Link
-                href="/admin/dashboard/portfolio"
-                className={`p-2 text-xs font-semibold rounded-lg ${
-                  pathname === "/admin/dashboard/portfolio" ? "bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-white" : "text-zinc-550 dark:text-zinc-400"
-                }`}
-              >
-                Portfolio
-              </Link>
-              <Link
-                href="/admin/dashboard/outbounds"
-                className={`p-2 text-xs font-semibold rounded-lg ${
-                  pathname.startsWith("/admin/dashboard/outbounds") ? "bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-white" : "text-zinc-550 dark:text-zinc-400"
-                }`}
-              >
-                Outbounds
-              </Link>
-              <Link
-                href="/admin/dashboard/personas"
-                className={`p-2 text-xs font-semibold rounded-lg ${
-                  pathname.startsWith("/admin/dashboard/personas") ? "bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-white" : "text-zinc-550 dark:text-zinc-400"
-                }`}
-              >
-                Personas
-              </Link>
+        <header className="border-b border-zinc-200/50 bg-white dark:border-zinc-800/50 dark:bg-zinc-900 flex-shrink-0">
+          <div className="h-16 flex items-center justify-between px-4 sm:px-6">
+            {/* Left: hamburger (mobile) + brand (mobile) + welcome (desktop) */}
+            <div className="flex items-center gap-3">
+              {/* Hamburger — mobile only */}
               <button
-                onClick={handleLogout}
-                className="p-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 rounded-lg cursor-pointer"
+                onClick={() => setMobileOpen(!mobileOpen)}
+                className="md:hidden inline-flex items-center justify-center p-2 rounded-lg text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:text-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                aria-expanded={mobileOpen}
               >
-                Logout
+                <span className="sr-only">Toggle menu</span>
+                {mobileOpen ? (
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                ) : (
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+                  </svg>
+                )}
               </button>
+
+              {/* Mobile brand */}
+              <Link href="/admin/dashboard" className="md:hidden flex items-center gap-2">
+                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-tr from-indigo-600 to-violet-500 text-white font-bold text-sm shadow-sm">
+                  G
+                </div>
+                <span className="text-sm font-bold tracking-tight text-zinc-900 dark:text-white">
+                  Genius<span className="text-indigo-600 dark:text-indigo-400">Admin</span>
+                </span>
+              </Link>
+
+              {/* Desktop welcome */}
+              <h2 className="hidden md:block text-sm font-semibold text-zinc-500 dark:text-zinc-400">
+                Welcome Back, Admin!
+              </h2>
             </div>
-            <h2 className="hidden md:block text-sm font-semibold text-zinc-500 dark:text-zinc-400">
-              Welcome Back, Admin!
-            </h2>
+
+            {/* Right: user avatar */}
+            <div className="flex items-center gap-3">
+              <div className="hidden sm:flex flex-col items-end">
+                <span className="text-xs font-bold text-zinc-800 dark:text-zinc-200">System Broker</span>
+                <span className="text-[10px] text-zinc-500 dark:text-zinc-500">Administrator</span>
+              </div>
+              <div className="h-8 w-8 rounded-full bg-gradient-to-tr from-indigo-500 to-violet-500 text-white font-bold text-xs flex items-center justify-center shadow-sm flex-shrink-0">
+                AD
+              </div>
+            </div>
           </div>
-          
-          {/* User profile */}
-          <div className="flex items-center gap-3">
-            <div className="hidden sm:flex flex-col items-end">
-              <span className="text-xs font-bold text-zinc-800 dark:text-zinc-200">System Broker</span>
-              <span className="text-[10px] text-zinc-450 dark:text-zinc-500">Administrator</span>
-            </div>
-            <div className="h-8 w-8 rounded-full bg-gradient-to-tr from-indigo-500 to-violet-500 text-white font-bold text-xs flex items-center justify-center shadow-sm">
-              AD
-            </div>
+
+          {/* Mobile drawer — slides down below the header bar */}
+          <div
+            className={`md:hidden overflow-hidden transition-all duration-300 ease-in-out ${
+              mobileOpen ? "max-h-screen border-t border-zinc-200 dark:border-zinc-800" : "max-h-0"
+            }`}
+          >
+            <nav className="px-4 py-3 space-y-1 bg-white dark:bg-zinc-900">
+              {menuItems.map((item) => {
+                const isActive =
+                  pathname === item.href ||
+                  (item.href !== "/admin/dashboard" && pathname.startsWith(item.href + "/"));
+                return (
+                  <Link
+                    key={item.name}
+                    href={item.href}
+                    onClick={() => setMobileOpen(false)}
+                    className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                      isActive
+                        ? "bg-indigo-50 text-indigo-600 dark:bg-indigo-950/20 dark:text-indigo-400"
+                        : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+                    }`}
+                  >
+                    <svg className="h-5 w-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d={item.icon} />
+                    </svg>
+                    {item.name}
+                  </Link>
+                );
+              })}
+
+              <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800 space-y-1">
+                <Link
+                  href="/"
+                  onClick={() => setMobileOpen(false)}
+                  className="flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-semibold text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 transition-all"
+                >
+                  <svg className="h-5 w-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                  </svg>
+                  View Website
+                </Link>
+                <button
+                  onClick={() => { setMobileOpen(false); handleLogout(); }}
+                  className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-semibold text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/20 transition-all cursor-pointer text-left"
+                >
+                  <svg className="h-5 w-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                  </svg>
+                  Log Out
+                </button>
+              </div>
+            </nav>
           </div>
         </header>
 
         {/* Content */}
-        <main className="flex-1 overflow-y-auto p-6 sm:p-8">
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
           {children}
         </main>
       </div>
