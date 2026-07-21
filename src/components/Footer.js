@@ -65,6 +65,22 @@ export default function Footer() {
                   </li>
                   <li>
                     <Link
+                      href="/Blog"
+                      className="text-sm leading-6 text-zinc-600 hover:text-indigo-600 dark:text-zinc-400 dark:hover:text-indigo-400 transition-colors"
+                    >
+                      Blog
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
+                      href="/latest-updates"
+                      className="text-sm leading-6 text-zinc-600 hover:text-indigo-600 dark:text-zinc-400 dark:hover:text-indigo-400 transition-colors"
+                    >
+                      Latest Updates
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
                       href="/About"
                       className="text-sm leading-6 text-zinc-600 hover:text-indigo-600 dark:text-zinc-400 dark:hover:text-indigo-400 transition-colors"
                     >
