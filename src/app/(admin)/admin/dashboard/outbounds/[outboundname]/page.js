@@ -54,10 +54,50 @@ export default function OutboundCampaignDetails({ params }) {
     name: "",
     position: "",
     email: "",
+    reply_to_email: "",
     tone: "Professional"
   });
 
+  // Batch task dispatch state
+  const [sendingTaskId, setSendingTaskId] = useState(null);
+  const [sendTaskResult, setSendTaskResult] = useState(null);
+
+  // Email verification state & segmentation filters
+  const [verificationFilter, setVerificationFilter] = useState("all"); // "all" | "valid" | "risky" | "invalid"
+  const [verifyingContacts, setVerifyingContacts] = useState(false);
+  const [verifyResult, setVerifyResult] = useState(null);
+
   const todayStr = new Date().toISOString().split("T")[0];
+
+  // Trigger contact verification orchestrator
+  const handleVerifyCampaignContacts = async () => {
+    if (!campaign) return;
+    setVerifyingContacts(true);
+    setVerifyResult(null);
+
+    try {
+      const res = await fetch("/api/outbounds/verify-contacts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          domain: campaign.domain,
+          contacts: campaign.contacts || []
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setVerifyResult(`Verification failed: ${data.error || "Unknown error"}`);
+      } else {
+        setVerifyResult(`Verified ${data.total} email(s): ${data.valid?.length || 0} Valid, ${data.risky?.length || 0} Risky, ${data.invalid?.length || 0} Invalid.`);
+        fetchCampaign();
+      }
+    } catch (err) {
+      setVerifyResult(`Verification error: ${err.message}`);
+    } finally {
+      setVerifyingContacts(false);
+    }
+  };
 
   const fetchCampaign = () => {
     fetch(`/api/outbounds/${encodeURIComponent(outboundname)}`)
@@ -75,6 +115,7 @@ export default function OutboundCampaignDetails({ params }) {
           name: p.name || "",
           position: p.position || "",
           email: p.email || "",
+          reply_to_email: p.reply_to_email || p.replyToEmail || p.email || "",
           tone: p.tone || "Professional"
         });
 
@@ -85,6 +126,45 @@ export default function OutboundCampaignDetails({ params }) {
         setCampaign(null);
         setLoading(false);
       });
+  };
+
+  // Dispatch single sequence task message to all eligible contacts
+  const handleSendTaskToAllContacts = async (task) => {
+    if (!campaign) return;
+    setSendingTaskId(task.task_id);
+    setSendTaskResult(null);
+
+    try {
+      const res = await fetch("/api/outbounds/send-task", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          domain: campaign.domain,
+          taskId: task.task_id,
+          taskSubject: task.task_subject,
+          taskMessage: task.task_message,
+          persona: personaForm
+        })
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setSendTaskResult({ success: false, message: data.error || "Failed to dispatch task email" });
+      } else {
+        setSendTaskResult({
+          success: true,
+          message: data.message || `Dispatched to ${data.sentCount} contact(s). Replies will route to ${data.replyTo}.`,
+          sentCount: data.sentCount,
+          replyTo: data.replyTo
+        });
+        fetchCampaign();
+      }
+    } catch (err) {
+      setSendTaskResult({ success: false, message: err.message });
+    } finally {
+      setSendingTaskId(null);
+    }
   };
 
   useEffect(() => {
@@ -792,11 +872,26 @@ CEO | Aether Labs`,
     });
   }
 
-  const filteredContacts = activeContacts.filter(
-    (c) =>
+  const validCount = activeContacts.filter((c) => c.verificationStatus === "valid").length;
+  const riskyCount = activeContacts.filter((c) => c.verificationStatus === "risky" || (!c.verificationStatus && c.deliveryStatus !== "Bounced")).length;
+  const invalidCount = activeContacts.filter((c) => c.verificationStatus === "invalid" || c.deliveryStatus === "Bounced").length;
+
+  const filteredContacts = activeContacts.filter((c) => {
+    const searchMatch =
       c.email.toLowerCase().includes(contactSearchTerm.toLowerCase()) ||
-      c.businessDomain.toLowerCase().includes(contactSearchTerm.toLowerCase())
-  );
+      c.businessDomain.toLowerCase().includes(contactSearchTerm.toLowerCase());
+    
+    if (!searchMatch) return false;
+
+    if (verificationFilter === "valid") {
+      return c.verificationStatus === "valid";
+    } else if (verificationFilter === "risky") {
+      return c.verificationStatus === "risky" || (!c.verificationStatus && c.deliveryStatus !== "Bounced");
+    } else if (verificationFilter === "invalid") {
+      return c.verificationStatus === "invalid" || c.deliveryStatus === "Bounced";
+    }
+    return true;
+  });
 
   return (
     <div className="space-y-8 max-w-5xl mx-auto">
@@ -973,12 +1068,35 @@ CEO | Aether Labs`,
           </div>
         </div>
 
+        {/* Dispatch Result Banner */}
+        {sendTaskResult && (
+          <div
+            className={`px-6 py-3 border-b text-xs flex items-center justify-between ${
+              sendTaskResult.success
+                ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border-emerald-200/60 dark:border-emerald-800/40"
+                : "bg-rose-50 dark:bg-rose-950/40 text-rose-800 dark:text-rose-300 border-rose-200/60 dark:border-rose-800/40"
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <span className="font-bold">{sendTaskResult.success ? "✓ Task Dispatched:" : "⚠ Dispatch Failed:"}</span>
+              <span>{sendTaskResult.message}</span>
+            </div>
+            <button
+              onClick={() => setSendTaskResult(null)}
+              className="text-xs font-bold text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 cursor-pointer ml-3"
+            >
+              &times;
+            </button>
+          </div>
+        )}
+
         {/* Chat Conversation View Area */}
         <div className="p-6 bg-zinc-50/50 dark:bg-zinc-950/25 space-y-6 max-h-[600px] overflow-y-auto">
           {chatThread.length > 0 ? (
             chatThread.map((msg, idx) => {
               const isInbound = msg.type === "inbound";
               const taskStatus = msg.status.toLowerCase();
+              const isSendingThisTask = sendingTaskId === msg.originalTask?.task_id;
 
               return (
                 <div
@@ -1039,7 +1157,7 @@ CEO | Aether Labs`,
                     </div>
 
                     {/* Bubble Status/Info Footer */}
-                    <div className={`flex items-center gap-2 text-[9px] ${isInbound ? "justify-start text-zinc-450" : "justify-end text-zinc-450"}`}>
+                    <div className={`flex items-center gap-2 text-[9px] flex-wrap ${isInbound ? "justify-start text-zinc-450" : "justify-end text-zinc-450"}`}>
                       <span
                         className={`inline-flex items-center rounded-md px-1.5 py-0.5 font-bold ${taskStatus === "completed"
                             ? "bg-emerald-50/55 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400"
@@ -1061,6 +1179,27 @@ CEO | Aether Labs`,
                       {/* Inline Actions */}
                       {msg.originalTask && (
                         <div className="flex items-center gap-2 border-l border-zinc-200/40 dark:border-zinc-800/25 pl-2 ml-1">
+                          <button
+                            onClick={() => handleSendTaskToAllContacts(msg.originalTask)}
+                            disabled={isSendingThisTask}
+                            className="inline-flex items-center gap-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/80 dark:text-indigo-300 font-bold px-2 py-0.5 rounded transition-all cursor-pointer disabled:opacity-50"
+                            title={`Send message to all ${totalProspects} contact(s). Replies route to ${personaForm.reply_to_email || personaForm.email || "persona email"}`}
+                          >
+                            {isSendingThisTask ? (
+                              <>
+                                <div className="h-2.5 w-2.5 animate-spin rounded-full border-2 border-indigo-600 border-t-transparent" />
+                                Dispatching...
+                              </>
+                            ) : (
+                              <>
+                                <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                                </svg>
+                                Send to All ({totalProspects})
+                              </>
+                            )}
+                          </button>
+
                           <button
                             onClick={() => openEditTaskModal(msg.originalTask)}
                             className="text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300 font-bold cursor-pointer hover:underline"
@@ -1113,27 +1252,83 @@ CEO | Aether Labs`,
               </button>
             </div>
 
-            {/* Search Bar container */}
-            <div className="px-6 py-3 bg-zinc-50/30 dark:bg-zinc-900/30 border-b border-zinc-200/30 dark:border-zinc-800/20 flex flex-col sm:flex-row items-center justify-between gap-3 flex-shrink-0">
-              <div className="w-full sm:max-w-xs flex items-center bg-zinc-50 dark:bg-zinc-950 border border-zinc-200/40 dark:border-zinc-800/30 rounded-xl px-2.5 py-1.5 focus-within:ring-2 focus-within:ring-indigo-500/20">
-                <svg className="h-3.5 w-3.5 text-zinc-400 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-                <input
-                  type="text"
-                  value={contactSearchTerm}
-                  onChange={(e) => setContactSearchTerm(e.target.value)}
-                  placeholder="Search contacts..."
-                  className="w-full bg-transparent border-0 outline-none text-xs text-zinc-800 dark:text-zinc-200"
-                />
+            {/* Search Bar & Action Controls */}
+            <div className="px-6 py-3 bg-zinc-50/30 dark:bg-zinc-900/30 border-b border-zinc-200/30 dark:border-zinc-800/20 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 flex-shrink-0">
+              <div className="flex-1 flex items-center gap-2">
+                <div className="flex-1 flex items-center bg-zinc-50 dark:bg-zinc-950 border border-zinc-200/40 dark:border-zinc-800/30 rounded-xl px-2.5 py-1.5 focus-within:ring-2 focus-within:ring-indigo-500/20">
+                  <svg className="h-3.5 w-3.5 text-zinc-400 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                  <input
+                    type="text"
+                    value={contactSearchTerm}
+                    onChange={(e) => setContactSearchTerm(e.target.value)}
+                    placeholder="Search contacts..."
+                    className="w-full bg-transparent border-0 outline-none text-xs text-zinc-800 dark:text-zinc-200"
+                  />
+                </div>
               </div>
 
-              <button
-                onClick={() => setShowAddContactForm(!showAddContactForm)}
-                className="w-full sm:w-auto bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-955/30 dark:hover:bg-indigo-955/50 text-indigo-600 dark:text-indigo-400 font-semibold px-4 py-2 rounded-xl text-xs flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 transition-all"
-              >
-                {showAddContactForm ? "Close Form" : "Add Target Contact"}
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleVerifyCampaignContacts}
+                  disabled={verifyingContacts}
+                  className="bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 font-bold px-3 py-2 rounded-xl text-xs flex items-center gap-1.5 cursor-pointer active:scale-95 transition-all disabled:opacity-50"
+                  title="Verify all emails using Trigger.dev email verifier task"
+                >
+                  {verifyingContacts ? (
+                    <>
+                      <div className="h-3 w-3 animate-spin rounded-full border-2 border-emerald-600 border-t-transparent" />
+                      Verifying...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="h-3.5 w-3.5 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      Verify Emails
+                    </>
+                  )}
+                </button>
+
+                <button
+                  onClick={() => setShowAddContactForm(!showAddContactForm)}
+                  className="bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-955/30 dark:hover:bg-indigo-955/50 text-indigo-600 dark:text-indigo-400 font-semibold px-3 py-2 rounded-xl text-xs flex items-center gap-1.5 cursor-pointer active:scale-95 transition-all"
+                >
+                  {showAddContactForm ? "Close Form" : "+ Add Contact"}
+                </button>
+              </div>
+            </div>
+
+            {/* Segmented Filter Pills */}
+            <div className="px-6 py-2 bg-zinc-100/50 dark:bg-zinc-950/40 border-b border-zinc-200/20 dark:border-zinc-800/20 flex items-center justify-between flex-wrap gap-2 text-xs">
+              <div className="flex items-center gap-1">
+                {[
+                  { id: "all", label: `All (${totalProspects})` },
+                  { id: "valid", label: `Valid (${validCount})`, color: "emerald" },
+                  { id: "risky", label: `Risky (${riskyCount})`, color: "amber" },
+                  { id: "invalid", label: `Invalid (${invalidCount})`, color: "rose" }
+                ].map((pill) => (
+                  <button
+                    key={pill.id}
+                    onClick={() => setVerificationFilter(pill.id)}
+                    className={`px-3 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                      verificationFilter === pill.id
+                        ? "bg-white dark:bg-zinc-800 text-indigo-600 dark:text-indigo-400 shadow-xs"
+                        : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900"
+                    }`}
+                  >
+                    {pill.label}
+                  </button>
+                ))}
+              </div>
+
+              {verifyResult && (
+                <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 truncate max-w-[260px]">
+                  {verifyResult}
+                </span>
+              )}
             </div>
 
             {/* Scrollable prospects list */}
@@ -1212,7 +1407,25 @@ CEO | Aether Labs`,
                         </p>
                       </div>
 
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2 flex-wrap justify-end">
+                        {/* Verification Status Badge */}
+                        <span
+                          className={`inline-flex items-center rounded-md px-2 py-0.5 text-[9px] font-bold ${
+                            contact.verificationStatus === "valid"
+                              ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300 border border-emerald-300/40"
+                              : contact.verificationStatus === "invalid" || contact.deliveryStatus === "Bounced"
+                              ? "bg-rose-100 text-rose-800 dark:bg-rose-950/80 dark:text-rose-300 border border-rose-300/40"
+                              : "bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300 border border-amber-300/40"
+                          }`}
+                        >
+                          {contact.verificationStatus
+                            ? contact.verificationStatus.toUpperCase()
+                            : contact.deliveryStatus === "Bounced"
+                            ? "INVALID"
+                            : "UNVERIFIED"}
+                        </span>
+
+                        {/* Delivery Status Badge */}
                         <span
                           className={`inline-flex items-center rounded-md px-2 py-0.5 text-[9px] font-bold ${contact.deliveryStatus === "Sent"
                               ? "bg-blue-50/50 dark:bg-blue-950/20 text-blue-600 dark:text-blue-400"

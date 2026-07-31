@@ -48,13 +48,13 @@ export async function runGeneratePersonaImage(personaId) {
   const persona = data[0];
   const name = persona.name || "User";
   const gender = (persona.gender || "Male").toLowerCase();
-  
+
   console.log(`[Image Generator]: Generating avatar for ${name} (${gender})...`);
-  
+
   let photoId = "";
   const seedString = personaId + "-" + name;
   const hash = Math.abs(hashCode(seedString));
-  
+
   if (gender === "male") {
     photoId = malePhotos[hash % malePhotos.length];
   } else if (gender === "female") {
@@ -64,11 +64,11 @@ export async function runGeneratePersonaImage(personaId) {
   }
 
   const generatedUrl = `https://images.unsplash.com/${photoId}?auto=format&fit=crop&w=256&h=256&q=80`;
-  
+
   console.log(`[Image Generator]: Generated URL: ${generatedUrl}. Saving to database...`);
-  
+
   await sql("UPDATE personas SET image_url = $1 WHERE id = $2", [generatedUrl, personaId]);
-  
+
   return {
     success: true,
     personaId,

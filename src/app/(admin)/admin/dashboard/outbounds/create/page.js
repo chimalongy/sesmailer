@@ -159,17 +159,25 @@ function CreateOutboundCampaignContent() {
     e.preventDefault();
     setError("");
     
+    const manualParsed = parseEmailsText(emailsText);
+    
     if (autoFetch) {
-      const parsed = getAutoEmails();
-      setContacts(parsed);
+      // Merge typed manual emails with sample initial auto emails if typed list is empty
+      const autoSample = getAutoEmails();
+      const combined = [...manualParsed];
+      for (const item of autoSample) {
+        if (!combined.some((c) => c.email.toLowerCase() === item.email.toLowerCase())) {
+          combined.push(item);
+        }
+      }
+      setContacts(combined);
       setStep(3);
     } else {
-      const parsed = parseEmailsText(emailsText);
-      if (parsed.length === 0) {
+      if (manualParsed.length === 0) {
         setError("Please input at least one valid target email address.");
         return;
       }
-      setContacts(parsed);
+      setContacts(manualParsed);
       setStep(3);
     }
   };
@@ -207,6 +215,7 @@ function CreateOutboundCampaignContent() {
       status: "Sent",
       defaultSendTime: "09:00",
       selling_price: sellingPrice.trim() || null,
+      autoFetch: autoFetch,
       contacts: contacts,
       tasks: [], // Newly created outbounds should not have any tasks.
       persona: {
@@ -369,23 +378,22 @@ function CreateOutboundCampaignContent() {
               </label>
             </div>
 
-            {/* Email Textarea (Conditionally Disabled) */}
-            <div className={`space-y-2 transition-opacity duration-200 ${autoFetch ? "opacity-45 pointer-events-none" : ""}`}>
+            {/* Email Textarea (Always Enabled) */}
+            <div className="space-y-2">
               <label htmlFor="emailsText" className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">
-                Target Emails List *
+                Target Emails List {autoFetch ? "(Optional — AI will also auto-find leads)" : "*"}
               </label>
               <textarea
                 id="emailsText"
                 rows="7"
                 required={!autoFetch}
-                disabled={autoFetch}
                 value={emailsText}
                 onChange={(e) => setEmailsText(e.target.value)}
                 placeholder="e.g.&#10;founder@startups.com&#10;broker@agency.net, investor@fund.co"
                 className="w-full rounded-xl bg-zinc-50 dark:bg-zinc-950 px-4 py-3 text-sm text-zinc-900 dark:text-zinc-100 border border-zinc-200/40 dark:border-zinc-800/30 focus:outline-none focus:border-indigo-505 font-mono resize-none leading-relaxed"
               ></textarea>
               <p className="text-[10px] text-zinc-450 italic">
-                Format: Provide one email address per line or separate them with commas. Email domains are parsed automatically.
+                Format: Provide custom target emails per line or separated by commas. {autoFetch && "The AI agent will also scrape additional leads for this domain."}
               </p>
             </div>
           </div>

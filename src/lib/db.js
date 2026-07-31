@@ -159,10 +159,13 @@ export async function ensureTablesExistAndSeeded() {
       ADD COLUMN IF NOT EXISTS city VARCHAR(100)
     `);
 
-    // Ensure niche column exists in domains for active database schemas
+    // Ensure location, niche, service, and scrape_prompt columns exist in domains table
     await sql(`
       ALTER TABLE domains 
-      ADD COLUMN IF NOT EXISTS niche VARCHAR(100)
+      ADD COLUMN IF NOT EXISTS location VARCHAR(255),
+      ADD COLUMN IF NOT EXISTS niche VARCHAR(255),
+      ADD COLUMN IF NOT EXISTS service VARCHAR(255),
+      ADD COLUMN IF NOT EXISTS scrape_prompt TEXT
     `);
 
     // 2. Create outbounds table (supports selling_price, without outbound-level subject)
@@ -188,19 +191,6 @@ export async function ensureTablesExistAndSeeded() {
       ADD COLUMN IF NOT EXISTS persona JSONB DEFAULT '{}'::jsonb
     `);
 
-    // 3. Create inquiries table
-    await sql(`
-      CREATE TABLE IF NOT EXISTS inquiries (
-        id VARCHAR(50) PRIMARY KEY,
-        name VARCHAR(255) NOT NULL,
-        email VARCHAR(255) NOT NULL,
-        domain VARCHAR(255) NOT NULL,
-        offer_price VARCHAR(50),
-        message TEXT,
-        date VARCHAR(20) NOT NULL,
-        status VARCHAR(50) NOT NULL DEFAULT 'New'
-      )
-    `);
 
     // 4. Create personas table
     await sql(`
@@ -211,7 +201,16 @@ export async function ensureTablesExistAndSeeded() {
         email VARCHAR(255) NOT NULL,
         tone VARCHAR(50) NOT NULL,
         image_url VARCHAR(550),
-        gender VARCHAR(50)
+        gender VARCHAR(50),
+        reply_to_email VARCHAR(255),
+        company_address VARCHAR(255),
+        company_address_2 VARCHAR(255),
+        city VARCHAR(100),
+        state VARCHAR(100),
+        zip_code VARCHAR(50),
+        country VARCHAR(100),
+        sendgrid_sender_id VARCHAR(100),
+        sendgrid_verified BOOLEAN DEFAULT FALSE
       )
     `);
 
@@ -225,6 +224,20 @@ export async function ensureTablesExistAndSeeded() {
     await sql(`
       ALTER TABLE personas 
       ADD COLUMN IF NOT EXISTS gender VARCHAR(50)
+    `);
+
+    // Ensure SendGrid Sender Identity and CAN-SPAM columns exist
+    await sql(`
+      ALTER TABLE personas
+      ADD COLUMN IF NOT EXISTS reply_to_email VARCHAR(255),
+      ADD COLUMN IF NOT EXISTS company_address VARCHAR(255),
+      ADD COLUMN IF NOT EXISTS company_address_2 VARCHAR(255),
+      ADD COLUMN IF NOT EXISTS city VARCHAR(100),
+      ADD COLUMN IF NOT EXISTS state VARCHAR(100),
+      ADD COLUMN IF NOT EXISTS zip_code VARCHAR(50),
+      ADD COLUMN IF NOT EXISTS country VARCHAR(100),
+      ADD COLUMN IF NOT EXISTS sendgrid_sender_id VARCHAR(100),
+      ADD COLUMN IF NOT EXISTS sendgrid_verified BOOLEAN DEFAULT FALSE
     `);
 
     console.log("Database schema integrity verification completed successfully!");

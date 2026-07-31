@@ -29,7 +29,8 @@ export default function AdminDashboardLayout({ children }) {
     { name: "Portfolio Manager", href: "/admin/dashboard/portfolio", icon: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" },
     { name: "Outbounds", href: "/admin/dashboard/outbounds", icon: "M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" },
     { name: "Personas", href: "/admin/dashboard/personas", icon: "M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" },
-    { name: "Templates", href: "/admin/dashboard/templates", icon: "M7 21h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v12a2 2 0 002 2zM9 9h6m-6 4h6m-6 4h4" }
+    { name: "Templates", href: "/admin/dashboard/templates", icon: "M7 21h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v12a2 2 0 002 2zM9 9h6m-6 4h6m-6 4h4" },
+    { name: "Email Verifier", href: "/admin/dashboard/verify-email", icon: "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" }
   ];
 
   if (!authorized) {

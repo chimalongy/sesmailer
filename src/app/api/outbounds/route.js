@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { sql, ensureTablesExistAndSeeded, resetAndSeedOutbounds } from "@/lib/db";
+import { runDomainAnalyzer } from "@/trigger/domainAnalyzer";
+import { tasks } from "@trigger.dev/sdk/v3";
 
 export async function GET() {
   await ensureTablesExistAndSeeded();
@@ -27,17 +29,19 @@ export async function GET() {
 export async function POST(request) {
   try {
     const body = await request.json();
-    const { id, domain, industry, template, date, status, defaultSendTime, selling_price, contacts, tasks, persona } = body;
+    const { id, domain, industry, template, date, status, defaultSendTime, selling_price, contacts, tasks: reqTasks, persona, autoFetch } = body;
 
     if (!domain) {
       return NextResponse.json({ error: "Domain name is required" }, { status: 400 });
     }
 
     const campaignId = id || "out-" + Date.now();
-    const finalContacts = contacts || [];
-    const finalTasks = tasks || [];
+    const rawContacts = contacts || [];
+    const finalTasks = reqTasks || [];
     const finalPersona = persona || { name: "", position: "", email: "", tone: "Professional" };
+    const shouldAutoFetch = autoFetch !== false;
 
+    // 1. Save campaign initially to database FIRST
     await sql(
       `INSERT INTO outbounds (id, domain, industry, template, date, status, default_send_time, selling_price, contacts, tasks, persona)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
@@ -50,13 +54,42 @@ export async function POST(request) {
         status || "Sent",
         defaultSendTime || "09:00",
         selling_price || null,
-        JSON.stringify(finalContacts),
+        JSON.stringify(rawContacts),
         JSON.stringify(finalTasks),
         JSON.stringify(finalPersona)
       ]
     );
 
-    return NextResponse.json({ success: true, id: campaignId });
+    // 2. Trigger multi-stage Trigger.dev domain analyzer pipeline after saving to database
+    let triggerTaskRunId = null;
+    try {
+      if (process.env.TRIGGER_SECRET_KEY) {
+        const handle = await tasks.trigger("domain-analyzer", {
+          domain,
+          autoFetch: shouldAutoFetch,
+          contacts: rawContacts
+        });
+        triggerTaskRunId = handle?.id || null;
+      } else {
+        // Run domain analyzer in non-blocking background promise if Trigger.dev SDK key is not set
+        runDomainAnalyzer(domain, shouldAutoFetch, rawContacts).catch((err) => {
+          console.error("Background domain analyzer error:", err);
+        });
+      }
+    } catch (triggerErr) {
+      console.warn("Trigger.dev trigger warning (falling back to background execution):", triggerErr.message);
+      runDomainAnalyzer(domain, shouldAutoFetch, rawContacts).catch((err) => {
+        console.error("Background domain analyzer error:", err);
+      });
+    }
+
+    // 3. Immediately return response confirming saved campaign
+    return NextResponse.json({
+      success: true,
+      id: campaignId,
+      triggerTaskRunId,
+      message: `Outbound campaign for ${domain} successfully saved. AI domain analysis and lead discovery tasks launched in background.`
+    });
   } catch (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

@@ -11,11 +11,36 @@ export default function OutboundRepliesPage({ params }) {
 
   const [campaign, setCampaign] = useState(null);
   const [loading, setLoading] = useState(true);
-  
+  const [syncingS3, setSyncingS3] = useState(false);
+  const [syncStatus, setSyncStatus] = useState(null);
+
   // Thread Modal States
   const [selectedProspectEmail, setSelectedProspectEmail] = useState("");
   const [showThreadModal, setShowThreadModal] = useState(false);
   const [replyText, setReplyText] = useState("");
+
+  const handleSyncS3Replies = async () => {
+    setSyncingS3(true);
+    setSyncStatus(null);
+    try {
+      const res = await fetch("/api/fetch-replies", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ domain: campaign?.domain || outboundname })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setSyncStatus({ success: false, message: data.error || "S3 sync failed" });
+      } else {
+        setSyncStatus({ success: true, message: data.message || `Synced ${data.count} replies` });
+        fetchCampaign();
+      }
+    } catch (err) {
+      setSyncStatus({ success: false, message: err.message });
+    } finally {
+      setSyncingS3(false);
+    }
+  };
 
   // Keyboard shortcut to close modal via Escape key
   useEffect(() => {
@@ -238,14 +263,33 @@ export default function OutboundRepliesPage({ params }) {
     e.preventDefault();
     if (!replyText.trim() || !selectedProspect || isBounced) return;
 
+    const persona = campaign.persona || {};
+    const replySubject = selectedProspect.messages && selectedProspect.messages.length > 0 
+      ? `Re: ${selectedProspect.messages[selectedProspect.messages.length - 1].subject}`
+      : `Re: Strategic domain proposal: ${campaign.domain}`;
+
+    // Dispatch email via SendGrid using persona details
+    if (persona.email) {
+      fetch("/api/send-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          to: selectedProspect.email,
+          subject: replySubject,
+          message: replyText.trim(),
+          fromName: persona.name || "",
+          fromEmail: persona.email || "",
+          replyTo: persona.reply_to_email || persona.replyToEmail || persona.email || undefined
+        })
+      }).catch((err) => console.warn("Failed to dispatch reply via SendGrid:", err));
+    }
+
     const newReply = {
       id: "reply-" + Date.now(),
       sender: "broker",
       date: new Date().toISOString().split("T")[0],
       time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      subject: selectedProspect.messages && selectedProspect.messages.length > 0 
-        ? `Re: ${selectedProspect.messages[selectedProspect.messages.length - 1].subject}`
-        : `Re: Strategic domain proposal: ${campaign.domain}`,
+      subject: replySubject,
       body: replyText.trim()
     };
 
@@ -276,14 +320,46 @@ export default function OutboundRepliesPage({ params }) {
         </Link>
       </div>
 
-      <div className="border-b border-zinc-200/40 dark:border-zinc-800/30 pb-5">
-        <h1 className="text-3xl font-extrabold tracking-tight text-zinc-900 dark:text-white">
-          Inbound Lead Negotiation Desk
-        </h1>
-        <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
-          Replies and deliverability logs for acquisition campaign: <strong>{campaign.domain}</strong>
-        </p>
+      <div className="border-b border-zinc-200/40 dark:border-zinc-800/30 pb-5 flex items-center justify-between flex-wrap gap-4">
+        <div>
+          <h1 className="text-3xl font-extrabold tracking-tight text-zinc-900 dark:text-white">
+            Inbound Lead Negotiation Desk
+          </h1>
+          <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
+            Replies and deliverability logs for acquisition campaign: <strong>{campaign.domain}</strong>
+          </p>
+        </div>
+        <button
+          onClick={handleSyncS3Replies}
+          disabled={syncingS3}
+          className="rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs px-4 py-2.5 shadow transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+        >
+          {syncingS3 ? (
+            <>
+              <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+              Syncing S3...
+            </>
+          ) : (
+            <>
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              Sync Replies from S3
+            </>
+          )}
+        </button>
       </div>
+
+      {syncStatus && (
+        <div className={`rounded-xl p-4 text-xs font-semibold border flex items-center gap-2 ${
+          syncStatus.success
+            ? "bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-400 border-emerald-200/40 dark:border-emerald-800/30"
+            : "bg-rose-50 dark:bg-rose-950/20 text-rose-700 dark:text-rose-400 border-rose-200/40 dark:border-rose-800/30"
+        }`}>
+          <span>{syncStatus.success ? "✓" : "⚠️"}</span>
+          <span>{syncStatus.message}</span>
+        </div>
+      )}
 
       {inboxContacts.length === 0 ? (
         <div className="bg-white dark:bg-zinc-900 border border-zinc-200/40 dark:border-zinc-800/25 rounded-2xl p-12 text-center shadow-sm">
