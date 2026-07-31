@@ -91,59 +91,7 @@ function CreateOutboundCampaignContent() {
       });
   };
 
-  const getAutoEmails = () => {
-    const baseName = domainName.split(".")[0] || "brand";
-    const category = targetDomain ? targetDomain.category : "Tech";
-    
-    let generatedEmails = [];
-    if (category === "AI & Tech") {
-      generatedEmails = [
-        `acquisitions@${baseName}labs.io`,
-        `contact@${baseName}intelligence.ai`,
-        `ceo@${baseName}agentic.com`,
-        `partner@${baseName}ventures.vc`
-      ];
-    } else if (category === "Fintech") {
-      generatedEmails = [
-        `treasury@${baseName}pay.com`,
-        `finance@${baseName}capital.io`,
-        `deals@${baseName}holdings.co`
-      ];
-    } else if (category === "SaaS" || category === "Tech") {
-      generatedEmails = [
-        `platform@${baseName}apps.io`,
-        `founder@${baseName}software.com`,
-        `product@${baseName}cloud.net`
-      ];
-    } else if (category === "Payments") {
-      generatedEmails = [
-        `checkout@${baseName}pay.com`,
-        `settlement@${baseName}gateway.io`,
-        `ops@${baseName}finance.net`
-      ];
-    } else if (category === "Geo domain") {
-      generatedEmails = [
-        `info@${baseName}directory.com`,
-        `advertise@${baseName}guide.net`,
-        `broker@${baseName}ventures.co`
-      ];
-    } else {
-      generatedEmails = [
-        `contact@${baseName}brand.com`,
-        `broker@${baseName}corp.io`,
-        `leads@${baseName}digital.net`
-      ];
-    }
-    
-    return generatedEmails.map((email) => {
-      const domain = email.split("@")[1] || "company.com";
-      return {
-        email,
-        businessDomain: domain,
-        deliveryStatus: "Sent"
-      };
-    });
-  };
+
 
   const handleNextToStep2 = (e) => {
     e.preventDefault();
@@ -161,25 +109,13 @@ function CreateOutboundCampaignContent() {
     
     const manualParsed = parseEmailsText(emailsText);
     
-    if (autoFetch) {
-      // Merge typed manual emails with sample initial auto emails if typed list is empty
-      const autoSample = getAutoEmails();
-      const combined = [...manualParsed];
-      for (const item of autoSample) {
-        if (!combined.some((c) => c.email.toLowerCase() === item.email.toLowerCase())) {
-          combined.push(item);
-        }
-      }
-      setContacts(combined);
-      setStep(3);
-    } else {
-      if (manualParsed.length === 0) {
-        setError("Please input at least one valid target email address.");
-        return;
-      }
-      setContacts(manualParsed);
-      setStep(3);
+    if (!autoFetch && manualParsed.length === 0) {
+      setError("Please input at least one valid target email address or enable auto-find.");
+      return;
     }
+
+    setContacts(manualParsed);
+    setStep(3);
   };
 
   const handleLaunchCampaign = () => {
