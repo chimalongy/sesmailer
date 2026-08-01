@@ -15,9 +15,11 @@ export async function ensureLlmTablesExist() {
         email TEXT DEFAULT NULL,
         is_active BOOLEAN DEFAULT TRUE,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-      );
+      )
+    `);
 
-      ALTER TABLE llm_apis ADD COLUMN IF NOT EXISTS email TEXT DEFAULT NULL;
+    await sql(`
+      ALTER TABLE llm_apis ADD COLUMN IF NOT EXISTS email TEXT DEFAULT NULL
     `);
 
     await sql(`
@@ -27,8 +29,10 @@ export async function ensureLlmTablesExist() {
         value TEXT NOT NULL,
         usage_count INT DEFAULT 0,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-      );
+      )
+    `);
 
+    await sql(`
       CREATE TABLE IF NOT EXISTS firecrawl_apis (
         id SERIAL PRIMARY KEY,
         email TEXT NOT NULL,
@@ -37,7 +41,7 @@ export async function ensureLlmTablesExist() {
         last_used_date DATE DEFAULT CURRENT_DATE,
         is_active BOOLEAN DEFAULT TRUE,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-      );
+      )
     `);
   } catch (err) {
     console.warn("[LLM DB]: Table initialization warning:", err.message);

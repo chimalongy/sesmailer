@@ -9,11 +9,10 @@ import { runVerifyCampaignContacts } from "./verifyCampaignContacts";
 const businessLeadsSchema = z.object({
   businesses: z.array(
     z.object({
-      website_url: z.string().describe("COMPULSORY: Direct website URL of the business. Must exist."),
-      name: z.string().nullable().describe("Formal business name or clinic name."),
+      business_name: z.string().nullable().describe("Formal business name or clinic name."),
+      website: z.string().describe("COMPULSORY: Direct website URL of the business. Must exist."),
       owner_name: z.string().nullable().describe("Business owner or decision maker's full name if found."),
-      owner_email: z.string().nullable().describe("Business owner or direct contact email address if found."),
-      phone: z.string().nullable().describe("Contact phone number.")
+      owner_email: z.string().nullable().describe("Business owner or direct contact email address if found.")
     })
   )
 });
@@ -45,27 +44,44 @@ export async function runScrapeDomainEmails({ domain, location, niche, service, 
       schema: businessLeadsSchema
     });
 
-    if (response?.success && Array.isArray(response.data?.businesses)) {
-      scrapedLeads = response.data.businesses;
+    console.log(`[Scrape Domain Emails]: Firecrawl agent response status: ${response?.success ? "success" : "failed"}`);
+
+    const rawData = response?.data;
+    if (rawData) {
+      if (Array.isArray(rawData)) {
+        scrapedLeads = rawData;
+      } else if (Array.isArray(rawData.businesses)) {
+        scrapedLeads = rawData.businesses;
+      } else if (typeof rawData.businesses === "object" && rawData.businesses !== null) {
+        scrapedLeads = Object.values(rawData.businesses);
+      } else if (typeof rawData === "object" && rawData !== null) {
+        scrapedLeads = Object.values(rawData);
+      }
     }
   } catch (scrapeErr) {
     console.error("[Scrape Domain Emails]: Firecrawl scraping error:", scrapeErr.message);
   }
 
-  // 2. Parse scraped businesses into contact items (website_url is compulsory)
+  // 2. Parse scraped businesses into contact items (website URL is compulsory)
   const newContacts = [];
   for (const lead of scrapedLeads) {
-    if (!lead.website_url) continue; // Compulsory check: website URL must exist
+    if (!lead || typeof lead !== "object") continue;
+
+    const websiteUrl = lead.website || lead.website_url || lead.url || lead.link;
+    if (!websiteUrl || typeof websiteUrl !== "string") continue; // Compulsory check: website URL must exist
+
+    const businessName = lead.business_name || lead.name || null;
+    const ownerName = lead.owner_name || lead.owner || null;
+    let leadEmail = lead.owner_email || lead.email || lead.contact_email || null;
 
     let leadDomain = "";
     try {
-      const parsedUrl = new URL(lead.website_url.startsWith("http") ? lead.website_url : `https://${lead.website_url}`);
+      const parsedUrl = new URL(websiteUrl.startsWith("http") ? websiteUrl : `https://${websiteUrl}`);
       leadDomain = parsedUrl.hostname.replace(/^www\./, "");
     } catch (_) {
       leadDomain = domain;
     }
 
-    let leadEmail = lead.owner_email || lead.email;
     if (!leadEmail && leadDomain) {
       leadEmail = `info@${leadDomain}`;
     }
@@ -73,8 +89,8 @@ export async function runScrapeDomainEmails({ domain, location, niche, service, 
     if (leadEmail) {
       newContacts.push({
         email: leadEmail.toLowerCase().trim(),
-        ownerName: lead.owner_name || null,
-        businessName: lead.name || null,
+        ownerName: ownerName || null,
+        businessName: businessName || null,
         businessDomain: leadDomain || domain,
         deliveryStatus: "Sent"
       });
