@@ -9,9 +9,10 @@ import { runVerifyCampaignContacts } from "./verifyCampaignContacts";
 const businessLeadsSchema = z.object({
   businesses: z.array(
     z.object({
-      name: z.string().describe("Formal business name or clinic name."),
-      website_url: z.string().url().nullable().describe("Direct website URL of the business."),
-      email: z.string().nullable().describe("Public contact or inquiry email address if available."),
+      website_url: z.string().describe("COMPULSORY: Direct website URL of the business. Must exist."),
+      name: z.string().nullable().describe("Formal business name or clinic name."),
+      owner_name: z.string().nullable().describe("Business owner or decision maker's full name if found."),
+      owner_email: z.string().nullable().describe("Business owner or direct contact email address if found."),
       phone: z.string().nullable().describe("Contact phone number.")
     })
   )
@@ -34,7 +35,7 @@ export async function runScrapeDomainEmails({ domain, location, niche, service, 
     return { success: false, reason: "Firecrawl API key unavailable", contacts: userContacts };
   }
 
-  const promptToUse = scrapePrompt || `Find local ${niche || "businesses"} and ${service || "services"} providing these services in ${location || "United States"}. Extract their business names and direct website URLs.`;
+  const promptToUse = scrapePrompt || `You are an expert in lead generation and market research. Search Google and Google Maps to find local ${niche || "businesses"} and ${service || "services"} providing these services in ${location || "United States"}. Extract their business names, direct website URLs, business owner's name, and business owner's email address. The business website URL is COMPULSORY and must exist for every record; other fields may be left empty if not found.`;
 
   let scrapedLeads = [];
   try {
@@ -51,33 +52,29 @@ export async function runScrapeDomainEmails({ domain, location, niche, service, 
     console.error("[Scrape Domain Emails]: Firecrawl scraping error:", scrapeErr.message);
   }
 
-  // 2. Parse scraped businesses into contact items
+  // 2. Parse scraped businesses into contact items (website_url is compulsory)
   const newContacts = [];
   for (const lead of scrapedLeads) {
-    let leadEmail = lead.email;
-    let leadDomain = "";
+    if (!lead.website_url) continue; // Compulsory check: website URL must exist
 
-    if (lead.website_url) {
-      try {
-        const parsedUrl = new URL(lead.website_url.startsWith("http") ? lead.website_url : `https://${lead.website_url}`);
-        leadDomain = parsedUrl.hostname.replace(/^www\./, "");
-        if (!leadEmail) {
-          leadEmail = `info@${leadDomain}`;
-        }
-      } catch (_) {
-        leadDomain = domain;
-      }
+    let leadDomain = "";
+    try {
+      const parsedUrl = new URL(lead.website_url.startsWith("http") ? lead.website_url : `https://${lead.website_url}`);
+      leadDomain = parsedUrl.hostname.replace(/^www\./, "");
+    } catch (_) {
+      leadDomain = domain;
     }
 
-    if (!leadEmail && lead.name) {
-      const slug = lead.name.toLowerCase().replace(/[^a-z0-9]/g, "");
-      leadEmail = `contact@${slug}.com`;
-      leadDomain = `${slug}.com`;
+    let leadEmail = lead.owner_email || lead.email;
+    if (!leadEmail && leadDomain) {
+      leadEmail = `info@${leadDomain}`;
     }
 
     if (leadEmail) {
       newContacts.push({
         email: leadEmail.toLowerCase().trim(),
+        ownerName: lead.owner_name || null,
+        businessName: lead.name || null,
         businessDomain: leadDomain || domain,
         deliveryStatus: "Sent"
       });

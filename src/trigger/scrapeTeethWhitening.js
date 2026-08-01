@@ -7,8 +7,10 @@ import { analyzeDomainForScraping } from "@/lib/Ai/LLM-central";
 const businessSchema = z.object({
     businesses: z.array(
         z.object({
-            name: z.string().describe("The formal name of the teeth whitening business or dental clinic."),
-            website_url: z.string().url().nullable().describe("The direct URL to the business website."),
+            website_url: z.string().describe("COMPULSORY: Direct website URL of the business. Must exist."),
+            name: z.string().nullable().describe("The formal name of the business or dental clinic."),
+            owner_name: z.string().nullable().describe("Business owner or decision maker's full name if found."),
+            owner_email: z.string().nullable().describe("Business owner or direct contact email address if found."),
             phone: z.string().nullable().describe("Contact phone number."),
             rating: z.number().nullable().describe("Average rating if available.")
         })
@@ -22,7 +24,7 @@ export async function runScrape(location = "San Diego", niche = "teeth whitening
         throw new Error("FIRECRAWL_API_KEY is missing from environment variables.");
     }
 
-    let agentPrompt = `Find local ${niche} and dentists providing these services in ${location}. Extract their business names and direct website URLs.`;
+    let agentPrompt = `You are an expert in lead generation and market research. Search Google and Google Maps to find local ${niche} and dentists providing these services in ${location}. Extract their business names, direct website URLs, business owner's name, and business owner's email address. The business website URL is COMPULSORY and must exist for every record; other fields may be left empty if not found.`;
     if (domainName) {
         const domainAnalysis = await analyzeDomainForScraping(domainName);
         agentPrompt = domainAnalysis.scrapePrompt;

@@ -198,7 +198,7 @@ export async function analyzeDomainForScraping(domainName) {
     result = await callLLM(systemPrompt, userPrompt);
   } catch (err) {
     console.warn(`[LLM Central]: AI analysis fallback for "${normalizedDomain}":`, err.message);
-    
+
     // Heuristic fallback parser if LLM APIs are offline
     const cleanDomain = normalizedDomain.replace(/\.[a-z]+$/, "");
     const parts = cleanDomain.split(/[-_.]/);
@@ -207,14 +207,14 @@ export async function analyzeDomainForScraping(domainName) {
       location: parts.length > 1 ? parts[parts.length - 1] : "United States",
       niche: parts[0] || "businesses",
       service: parts[0] || "services",
-      scrapePrompt: `Find local ${parts[0] || "businesses"} and ${parts[0] || "services"} providing these services in ${parts.length > 1 ? parts[parts.length - 1] : "United States"}. Extract their business names and direct website URLs.`
+      scrapePrompt: `You are an expert in lead generation and market research agent. Search Google and Google Maps to find local ${parts[0] || "businesses"} and ${parts[0] || "services"} providing these services in ${parts.length > 1 ? parts[parts.length - 1] : "United States"}. Extract their business names, direct website URLs, business owner's name, and business owner's email address. The business website URL is COMPULSORY and must exist for every record; other fields may be left empty if not found.`
     };
   }
 
   const location = result?.location || "United States";
   const niche = result?.niche || "businesses";
   const service = result?.service || niche;
-  const scrapePrompt = result?.scrapePrompt || `Find local ${niche} and ${service} providing these services in ${location}. Extract their business names and direct website URLs.`;
+  const scrapePrompt = result?.scrapePrompt || `You are an expert in lead generation and market research agent. Search Google and Google Maps to find local ${niche} and ${service} providing these services in ${location}. Extract their business names, direct website URLs, business owner's name, and business owner's email address. The business website URL is COMPULSORY and must exist for every record; other fields may be left empty if not found.`;
 
   // Persist / Save extracted metadata directly to the portfolio (domains) table in Neon Postgres
   try {
