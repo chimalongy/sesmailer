@@ -207,14 +207,14 @@ export async function analyzeDomainForScraping(domainName) {
       location: parts.length > 1 ? parts[parts.length - 1] : "United States",
       niche: parts[0] || "businesses",
       service: parts[0] || "services",
-      scrapePrompt: `You are an expert in lead generation and market research agent. Search Google and Google Maps to find local ${parts[0] || "businesses"} and ${parts[0] || "services"} providing these services in ${parts.length > 1 ? parts[parts.length - 1] : "United States"}. Extract their business names, direct website URLs, business owner's name, and business owner's email address. The business website URL is COMPULSORY and must exist for every record; other fields may be left empty if not found.`
+      scrapePrompt: `You are an expert lead generation and market research agent. Search Google and Google Maps to find local ${parts[0] || "businesses"} and ${parts[0] || "services"} providing these services in ${parts.length > 1 ? parts[parts.length - 1] : "United States"}. Extract their business names, direct website URLs, business owner's name, and business owner's email address. If the business owner's email is not directly available on Google or their website, check the business Facebook page to find their official contact email address. The business website URL is COMPULSORY and must exist for every record; other fields may be left empty if not found.`
     };
   }
 
   const location = result?.location || "United States";
   const niche = result?.niche || "businesses";
   const service = result?.service || niche;
-  const scrapePrompt = result?.scrapePrompt || `You are an expert in lead generation and market research agent. Search Google and Google Maps to find local ${niche} and ${service} providing these services in ${location}. Extract their business names, direct website URLs, business owner's name, and business owner's email address. The business website URL is COMPULSORY and must exist for every record; other fields may be left empty if not found.`;
+  const scrapePrompt = result?.scrapePrompt || `You are an expert lead generation and market research agent. Search Google and Google Maps to find local ${niche} and ${service} providing these services in ${location}. Extract their business names, direct website URLs, business owner's name, and business owner's email address. If the business owner's email is not directly available on Google or their website, check the business Facebook page to find their official contact email address. The business website URL is COMPULSORY and must exist for every record; other fields may be left empty if not found.`;
 
   // Persist / Save extracted metadata directly to the portfolio (domains) table in Neon Postgres
   try {

@@ -35,7 +35,7 @@ export async function runScrapeDomainEmails({ domain, location, niche, service, 
     return { success: false, reason: "Firecrawl API key unavailable", contacts: userContacts };
   }
 
-  const promptToUse = scrapePrompt || `You are an expert in lead generation and market research. Search Google and Google Maps to find local ${niche || "businesses"} and ${service || "services"} providing these services in ${location || "United States"}. Extract their business names, direct website URLs, business owner's name, and business owner's email address. The business website URL is COMPULSORY and must exist for every record; other fields may be left empty if not found.`;
+  const promptToUse = scrapePrompt || `You are an expert lead generation and market research agent. Search Google Maps first then Google to find local ${niche || "businesses"} and ${service || "services"} providing these services in ${location || "United States"}. Extract their business names, direct website URLs, business owner's name, and business owner's email address. If the business owner's email is not directly available on Google or their website, check the business Facebook page to find their official contact email address. The business website URL is COMPULSORY and must exist for every record; other fields may be left empty if not found.`;
 
   let scrapedLeads = [];
   try {
