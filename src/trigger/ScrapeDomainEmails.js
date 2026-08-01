@@ -143,7 +143,7 @@ async function triggerVerification(domain, contacts) {
  */
 export const scrapeDomainEmailsTask = task({
   id: "scrape-domain-emails",
-  maxDuration: 300,
+  maxDuration: 7200,
   retry: {
     maxAttempts: 3,
     minTimeoutInMs: 5000,
