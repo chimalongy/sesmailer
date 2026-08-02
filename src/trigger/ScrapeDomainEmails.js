@@ -91,8 +91,7 @@ export async function runScrapeDomainEmails({ domain, location, niche, service, 
         email: leadEmail.toLowerCase().trim(),
         ownerName: ownerName || null,
         businessName: businessName || null,
-        businessDomain: leadDomain || domain,
-        deliveryStatus: "Sent"
+        businessDomain: leadDomain || domain
       });
     }
   }

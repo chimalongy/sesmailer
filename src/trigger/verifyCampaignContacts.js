@@ -9,27 +9,45 @@ import { sql } from "../lib/db.js";
 export async function runVerifyCampaignContacts(domain, contactsInput = null) {
   console.log(`[Email Verifier]: Starting verification task for domain "${domain}"...`);
 
-  // 1. Fetch Outbound Campaign from Neon DB if domain provided
+  // 1. Fetch Outbound Campaign & merge contacts from DB + contactsInput
   let campaign = null;
-  let contacts = contactsInput || [];
+  const contactsMap = new Map();
 
   if (domain) {
     const res = await sql("SELECT * FROM outbounds WHERE LOWER(domain) = LOWER($1) LIMIT 1", [domain.toLowerCase().trim()]);
     const rows = res.rows || res || [];
     if (rows.length > 0) {
       campaign = rows[0];
-      if (!contactsInput || contactsInput.length === 0) {
-        contacts = Array.isArray(campaign.contacts)
-          ? campaign.contacts
-          : typeof campaign.contacts === "string"
-          ? JSON.parse(campaign.contacts)
-          : [];
+      const dbContacts = Array.isArray(campaign.contacts)
+        ? campaign.contacts
+        : typeof campaign.contacts === "string"
+        ? JSON.parse(campaign.contacts)
+        : [];
+      
+      for (const item of dbContacts) {
+        const itemEmail = typeof item === "string" ? item : item?.email;
+        if (itemEmail && itemEmail.includes("@")) {
+          contactsMap.set(itemEmail.toLowerCase().trim(), typeof item === "string" ? { email: item.trim() } : item);
+        }
       }
     }
   }
 
+  if (Array.isArray(contactsInput)) {
+    for (const item of contactsInput) {
+      const itemEmail = typeof item === "string" ? item : item?.email;
+      if (itemEmail && itemEmail.includes("@")) {
+        const key = itemEmail.toLowerCase().trim();
+        const existing = contactsMap.get(key) || {};
+        contactsMap.set(key, { ...existing, ...(typeof item === "string" ? { email: item.trim() } : item) });
+      }
+    }
+  }
+
+  const contacts = Array.from(contactsMap.values());
+
   if (contacts.length === 0) {
-    console.log(`[Email Verifier]: No contacts found for verification.`);
+    console.log(`[Email Verifier]: No valid contacts found for verification.`);
     return {
       success: true,
       domain,
@@ -43,21 +61,28 @@ export async function runVerifyCampaignContacts(domain, contactsInput = null) {
   const validContacts = [];
   const riskyContacts = [];
   const invalidContacts = [];
-
   const verifiedContacts = [];
 
   // 2. Perform verification for each contact using checkEmail
   for (const contact of contacts) {
-    const email = typeof contact === "string" ? contact : contact.email;
-    const businessDomain = typeof contact === "string" ? email.split("@")[1] || "company.com" : (contact.businessDomain || email.split("@")[1] || "company.com");
+    const targetEmail = (typeof contact === "string" ? contact : (contact?.email || "")).trim();
     
-    console.log(`[Email Verifier]: Verifying ${email}...`);
+    if (!targetEmail || !targetEmail.includes("@")) {
+      console.warn("[Email Verifier]: Skipping contact with invalid email address:", contact);
+      continue;
+    }
+
+    const businessDomain = typeof contact === "string"
+      ? targetEmail.split("@")[1] || "company.com"
+      : (contact.businessDomain || targetEmail.split("@")[1] || "company.com");
+    
+    console.log(`[Email Verifier]: Verifying target email "${targetEmail}"...`);
 
     let checkResult = null;
     try {
-      checkResult = await checkEmail(email);
+      checkResult = await checkEmail(targetEmail);
     } catch (err) {
-      console.error(`[Email Verifier]: Error checking ${email}:`, err);
+      console.error(`[Email Verifier]: Error checking ${targetEmail}:`, err);
       checkResult = { verdict: "risky", error: err.message };
     }
 
@@ -69,15 +94,14 @@ export async function runVerifyCampaignContacts(domain, contactsInput = null) {
     } else if (verdict === "invalid") {
       verificationStatus = "invalid";
     } else {
-      // 'risky' or 'unknown'
       verificationStatus = "risky";
     }
 
     const updatedContact = {
       ...(typeof contact === "object" ? contact : {}),
-      email,
+      email: targetEmail,
       businessDomain,
-      deliveryStatus: verificationStatus === "invalid" ? "Bounced" : (contact.deliveryStatus || "Sent"),
+      ...(verificationStatus === "invalid" ? { deliveryStatus: "Bounced" } : contact?.deliveryStatus ? { deliveryStatus: contact.deliveryStatus } : {}),
       verificationStatus,
       verificationResult: {
         syntaxCheck: checkResult.syntaxCheck ?? null,
@@ -103,13 +127,37 @@ export async function runVerifyCampaignContacts(domain, contactsInput = null) {
     }
   }
 
-  // 3. Save categorized contacts back to Neon DB if campaign exists
-  if (domain && campaign) {
-    await sql(
-      `UPDATE outbounds SET contacts = $1 WHERE LOWER(domain) = LOWER($2)`,
-      [JSON.stringify(verifiedContacts), domain.toLowerCase().trim()]
-    );
-    console.log(`[Email Verifier]: Saved verified contacts to database for "${domain}".`);
+  // 3. Save merged & verified contacts back to Neon DB if domain is provided
+  if (domain) {
+    try {
+      const latestRes = await sql("SELECT contacts FROM outbounds WHERE LOWER(domain) = LOWER($1) LIMIT 1", [domain.toLowerCase().trim()]);
+      const latestRows = latestRes.rows || latestRes || [];
+      if (latestRows.length > 0) {
+        const latestDbContacts = Array.isArray(latestRows[0].contacts)
+          ? latestRows[0].contacts
+          : typeof latestRows[0].contacts === "string"
+          ? JSON.parse(latestRows[0].contacts)
+          : [];
+        
+        const saveMap = new Map();
+        for (const item of latestDbContacts) {
+          const e = typeof item === "string" ? item : item?.email;
+          if (e) saveMap.set(e.toLowerCase().trim(), typeof item === "string" ? { email: e.trim() } : item);
+        }
+        for (const item of verifiedContacts) {
+          if (item?.email) saveMap.set(item.email.toLowerCase().trim(), item);
+        }
+        const finalSavedList = Array.from(saveMap.values());
+        
+        await sql(
+          `UPDATE outbounds SET contacts = $1 WHERE LOWER(domain) = LOWER($2)`,
+          [JSON.stringify(finalSavedList), domain.toLowerCase().trim()]
+        );
+        console.log(`[Email Verifier]: Successfully persisted ${finalSavedList.length} verified contacts to database for "${domain}".`);
+      }
+    } catch (dbErr) {
+      console.error("[Email Verifier]: Error saving verified contacts to database:", dbErr.message);
+    }
   }
 
   console.log(`[Email Verifier]: Verification complete. Valid: ${validContacts.length}, Risky: ${riskyContacts.length}, Invalid: ${invalidContacts.length}`);

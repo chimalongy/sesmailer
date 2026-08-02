@@ -84,9 +84,10 @@ function CreateOutboundCampaignContent() {
       .map((email) => {
         const domain = email.split("@")[1] || "company.com";
         return {
-          email,
-          businessDomain: domain,
-          deliveryStatus: "Sent"
+          email: email.toLowerCase().trim(),
+          ownerName: null,
+          businessName: null,
+          businessDomain: domain
         };
       });
   };

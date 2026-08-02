@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
+import { runVerifyCampaignContacts } from "@/trigger/verifyCampaignContacts";
 
 export async function GET(request, { params }) {
   try {
@@ -68,6 +69,13 @@ export async function PUT(request, { params }) {
        WHERE LOWER(domain) = LOWER($7)`,
       [finalContacts, finalTasks, finalStatus, finalSendTime, finalSellingPrice, finalPersona, decodedDomain]
     );
+
+    // If contacts were updated, trigger email verification in background
+    if (contacts && Array.isArray(contacts)) {
+      runVerifyCampaignContacts(decodedDomain, contacts).catch((err) => {
+        console.error("Background contact verification error on PUT:", err);
+      });
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {
