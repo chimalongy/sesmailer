@@ -873,8 +873,9 @@ CEO | Aether Labs`,
   }
 
   const validCount = activeContacts.filter((c) => c.verificationStatus === "valid").length;
-  const riskyCount = activeContacts.filter((c) => c.verificationStatus === "risky" || (!c.verificationStatus && c.deliveryStatus !== "Bounced")).length;
-  const invalidCount = activeContacts.filter((c) => c.verificationStatus === "invalid" || c.deliveryStatus === "Bounced").length;
+  const unsubscribedCount = activeContacts.filter((c) => c.verificationStatus === "unsubscribed" || c.deliveryStatus === "Unsubscribed").length;
+  const riskyCount = activeContacts.filter((c) => (c.verificationStatus === "risky" || (!c.verificationStatus && c.deliveryStatus !== "Bounced" && c.deliveryStatus !== "Unsubscribed")) && c.verificationStatus !== "unsubscribed").length;
+  const invalidCount = activeContacts.filter((c) => (c.verificationStatus === "invalid" || c.deliveryStatus === "Bounced") && c.verificationStatus !== "unsubscribed" && c.deliveryStatus !== "Unsubscribed").length;
 
   const filteredContacts = activeContacts.filter((c) => {
     const searchMatch =
@@ -885,10 +886,12 @@ CEO | Aether Labs`,
 
     if (verificationFilter === "valid") {
       return c.verificationStatus === "valid";
+    } else if (verificationFilter === "unsubscribed") {
+      return c.verificationStatus === "unsubscribed" || c.deliveryStatus === "Unsubscribed";
     } else if (verificationFilter === "risky") {
-      return c.verificationStatus === "risky" || (!c.verificationStatus && c.deliveryStatus !== "Bounced");
+      return (c.verificationStatus === "risky" || (!c.verificationStatus && c.deliveryStatus !== "Bounced" && c.deliveryStatus !== "Unsubscribed")) && c.verificationStatus !== "unsubscribed";
     } else if (verificationFilter === "invalid") {
-      return c.verificationStatus === "invalid" || c.deliveryStatus === "Bounced";
+      return (c.verificationStatus === "invalid" || c.deliveryStatus === "Bounced") && c.verificationStatus !== "unsubscribed" && c.deliveryStatus !== "Unsubscribed";
     }
     return true;
   });
@@ -1307,6 +1310,7 @@ CEO | Aether Labs`,
                 {[
                   { id: "all", label: `All (${totalProspects})` },
                   { id: "valid", label: `Valid (${validCount})`, color: "emerald" },
+                  { id: "unsubscribed", label: `Unsubscribed (${unsubscribedCount})`, color: "purple" },
                   { id: "risky", label: `Risky (${riskyCount})`, color: "amber" },
                   { id: "invalid", label: `Invalid (${invalidCount})`, color: "rose" }
                 ].map((pill) => (
@@ -1413,12 +1417,16 @@ CEO | Aether Labs`,
                           className={`inline-flex items-center rounded-md px-2 py-0.5 text-[9px] font-bold ${
                             contact.verificationStatus === "valid"
                               ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300 border border-emerald-300/40"
+                              : contact.verificationStatus === "unsubscribed" || contact.deliveryStatus === "Unsubscribed"
+                              ? "bg-purple-100 text-purple-800 dark:bg-purple-950/80 dark:text-purple-300 border border-purple-300/40"
                               : contact.verificationStatus === "invalid" || contact.deliveryStatus === "Bounced"
                               ? "bg-rose-100 text-rose-800 dark:bg-rose-950/80 dark:text-rose-300 border border-rose-300/40"
                               : "bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300 border border-amber-300/40"
                           }`}
                         >
-                          {contact.verificationStatus
+                          {contact.verificationStatus === "unsubscribed" || contact.deliveryStatus === "Unsubscribed"
+                            ? "UNSUBSCRIBED"
+                            : contact.verificationStatus
                             ? contact.verificationStatus.toUpperCase()
                             : contact.deliveryStatus === "Bounced"
                             ? "INVALID"

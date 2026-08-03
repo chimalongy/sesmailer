@@ -51,7 +51,7 @@ export async function runTaskScheduler() {
           notBeforeSec = Math.floor((now.getTime() + 10000) / 1000);
         }
 
-        const baseUrl = process.env.APP_BASE_URL || process.env.NEXT_PUBLIC_APP_URL || "https://geniusdomainnames.com";
+        const baseUrl = process.env.APP_BASE_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
         const callbackUrl = `${baseUrl.replace(/\/$/, "")}/api/qstash/execute-task`;
 
         const payload = {

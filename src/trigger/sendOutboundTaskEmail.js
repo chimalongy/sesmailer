@@ -68,20 +68,25 @@ export async function runSendOutboundTaskEmail({ domain, taskId, taskSubject, ta
   // 3. Send email to each non-bounced contact
   for (let i = 0; i < contacts.length; i++) {
     const contact = contacts[i];
-    if (contact.deliveryStatus === "Bounced") continue;
+    if (contact.deliveryStatus === "Bounced" || contact.deliveryStatus === "Unsubscribed" || contact.verificationStatus === "unsubscribed") continue;
 
     const messageId = "out-msg-" + Date.now() + "-" + Math.random().toString(36).substring(2, 6);
     let sendSuccess = true;
 
+    const baseUrl = process.env.APP_BASE_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    const unsubscribeUrl = `${baseUrl.replace(/\/$/, "")}/unsubscribe?email=${encodeURIComponent(contact.email)}&domain=${encodeURIComponent(domain)}`;
+
+    const textWithUnsubscribe = `${taskMessage}\n\n---\nIf you prefer not to receive future emails regarding ${domain}, unsubscribe here: ${unsubscribeUrl}`;
+    const htmlWithUnsubscribe = `<pre style="font-family:Arial,sans-serif;font-size:14px;line-height:1.6;white-space:pre-wrap;">${taskMessage.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</pre><div style="margin-top:32px;padding-top:16px;border-top:1px solid #e4e4e7;font-size:11px;color:#71717a;font-family:sans-serif;"><p style="margin:0;">If you prefer not to receive future emails regarding ${domain}, <a href="${unsubscribeUrl}" style="color:#6366f1;text-decoration:underline;">click here to unsubscribe</a>.</p></div>`;
+
     if (isSendGridActive) {
       try {
-        const htmlBody = `<pre style="font-family:Arial,sans-serif;font-size:14px;line-height:1.6;white-space:pre-wrap;">${taskMessage.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</pre>`;
         const msg = {
           to: contact.email,
           from: fromName ? { name: fromName, email: fromEmail } : fromEmail,
           subject: taskSubject,
-          text: taskMessage,
-          html: htmlBody,
+          text: textWithUnsubscribe,
+          html: htmlWithUnsubscribe,
           ...(replyTo ? { replyTo } : {})
         };
 
