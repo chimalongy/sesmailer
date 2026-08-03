@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { sql, ensureTablesExistAndSeeded, resetAndSeedOutbounds } from "@/lib/db";
 import { runDomainAnalyzer } from "@/trigger/domainAnalyzer";
+import { runTaskScheduler } from "@/trigger/taskScheduler";
 import { tasks } from "@trigger.dev/sdk/v3";
 
 export async function GET() {
@@ -83,7 +84,16 @@ export async function POST(request) {
       });
     }
 
-    // 3. Immediately return response confirming saved campaign
+    // 3. Trigger taskScheduler immediately if any task is scheduled for today
+    const todayStr = new Date().toISOString().split("T")[0];
+    const hasTodayTask = Array.isArray(finalTasks) && finalTasks.some((t) => t.schedule_date === todayStr && (t.task_status === "scheduled" || !t.task_status));
+    if (hasTodayTask) {
+      runTaskScheduler().catch((err) => {
+        console.error("Background taskScheduler error on POST:", err);
+      });
+    }
+
+    // 4. Immediately return response confirming saved campaign
     return NextResponse.json({
       success: true,
       id: campaignId,

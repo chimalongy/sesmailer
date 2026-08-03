@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { runVerifyCampaignContacts } from "@/trigger/verifyCampaignContacts";
+import { runTaskScheduler } from "@/trigger/taskScheduler";
 
 export async function GET(request, { params }) {
   try {
@@ -74,6 +75,16 @@ export async function PUT(request, { params }) {
     if (contacts && Array.isArray(contacts)) {
       runVerifyCampaignContacts(decodedDomain, contacts).catch((err) => {
         console.error("Background contact verification error on PUT:", err);
+      });
+    }
+
+    // If tasks were updated and any task is scheduled for today, trigger taskScheduler immediately
+    const todayStr = new Date().toISOString().split("T")[0];
+    const parsedTasks = tasks ? (Array.isArray(tasks) ? tasks : JSON.parse(tasks)) : [];
+    const hasTodayTask = parsedTasks.some((t) => t.schedule_date === todayStr && (t.task_status === "scheduled" || !t.task_status));
+    if (hasTodayTask) {
+      runTaskScheduler().catch((err) => {
+        console.error("Background taskScheduler error on PUT:", err);
       });
     }
 

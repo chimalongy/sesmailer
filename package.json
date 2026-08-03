@@ -13,6 +13,7 @@
     "@neondatabase/serverless": "^1.1.0",
     "@sendgrid/mail": "^8.1.4",
     "@trigger.dev/sdk": "4.5.9",
+    "@upstash/qstash": "^2.11.3",
     "disposable-email-domains": "^1.0.62",
     "email-validator": "^2.0.4",
     "firecrawl": "^4.29.2",
